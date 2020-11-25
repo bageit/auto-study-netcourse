@@ -13,43 +13,30 @@ let config_switch_page_base_time = 1 * 1000;
 let config_switch_page_btn_call_count = 3,
     //当前课件翻页函数执行次数
     curr_switch_page_btn_call_count = 3;
+	
+// 介于有些课程会出现不论学习多久都不会完成的bug，每一课挂机的最大时长，单位毫秒
+let config_switch_page_max_time = 6 * 60 * 1000,
+	// 强跳定时器
+	strong_jump_timer = null;
+	startStrongJumpTimer();
 
-//控制台先引入JQuery，并启动自动刷课任务
+
+//启动自动刷课任务
 ; (function (document) {
-    let script = document.createElement('script');
-    if (script.readyState) {
-        // IE
-        script.onreadystatechange = function () {
-            if (script.readyState === 'loaded' || script.readyState === 'complete') {
-                script.onreadystatechange = null;
-                callback();
-            }
-        }
-    } else {
-        // 其他浏览器
-        script.onload = function () {
-            callback();
-        }
-    }
-    script.src = 'http://code.jquery.com/jquery-1.9.1.min.js';
-    document.body.appendChild(script);
-
     //开始提示文字输出
     console.clear();
     console.info(place_holder_str);
-    console.info("正在加载JQuery，请等待加载完成...");
     console.info(`请注意以下事项：
     1、保证浏览器已关闭同源策略
     2、网课平台正常登录有效
     3、已进入到课件播放页面(课件目录页不支持)`);
     console.info(place_holder_str);
-
+	callback();
     function callback() {
-        console.log("JQuery加载完成，即将进行授权检测并自动播放课件...");
-        console.info(place_holder_str);
         init();//初始化
     }
 })(document);
+
 
 /**
  * 获取页面标记判断课件是否已完成
@@ -57,8 +44,8 @@ let config_switch_page_btn_call_count = 3,
  * 已经学习完毕！获取了10分/总分10分。总计学习时间为：00:02:03。
  */
 function isComplete() {
-    let foot_remark = window.top.w_main.w_lms_content.document.querySelector("#tdRemark").innerText;
-
+    let foot_remark = window.top.w_main.w_lms_content.document.querySelector("html").innerText;
+	
     if (foot_remark.indexOf('正在学习') > -1) {
         console.info("定时检测：当前课件正在学习，请等待学习完成...");
         return false;
@@ -141,9 +128,24 @@ function nextCourseWare() {
         console.log("切换下一个课件...");
         btn_next.click();//切换课件
         curr_switch_page_btn_call_count = config_switch_page_btn_call_count;//重置翻页函数执行次数限制
+		
+		startStrongJumpTimer();
+		
     } else {
         console.error("找不到 <下一个> 按钮...");
     }
+	
+}
+
+/* 启动一个强跳定时器，即清除再启动 */
+function startStrongJumpTimer() {
+	// 清除强跳定时器
+	clearTimeout(strong_jump_timer);
+	strong_jump_timer = setTimeout(() => {	
+			console.info("当前课件存在问题，导致无法学习完毕，即将切换下一课件...")
+			// 下一页
+			nextCourseWare();
+	}, config_switch_page_max_time);
 }
 
 /**切换课件页码 */
@@ -178,7 +180,7 @@ function setFunCallMaxTimes(fun, nextFun) {
 function start() {
     setInterval(() => {
         //本课件完成后，切换下一课件
-        if (isComplete()) {
+		if (isComplete()) {
             nextCourseWare();
         }
         //课件未完成，则执行翻页
